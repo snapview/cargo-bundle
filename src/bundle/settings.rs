@@ -27,6 +27,7 @@ struct BundleSettings {
     short_description: Option<String>,
     long_description: Option<String>,
     script: Option<PathBuf>,
+    uri_scheme: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -231,6 +232,10 @@ impl Settings {
 
     pub fn long_description(&self) -> Option<&str> {
         self.bundle_settings.long_description.as_ref().map(String::as_str)
+    }
+
+    pub fn uri_scheme(&self) -> Option<&str> {
+        self.bundle_settings.uri_scheme.as_ref().map(String::as_str)
     }
 }
 

@@ -38,9 +38,11 @@ pub fn bundle_project(settings: &Settings) -> ::Result<Vec<PathBuf>> {
 
     let resources_dir = bundle_directory.join("Resources");
 
-    let bundle_icon_file: Option<PathBuf> = create_icns_file(&settings.bundle_name(),
-                                                             &resources_dir,
-                                                             settings.icon_files().cloned().collect())?;
+    let bundle_icon_file: Option<PathBuf> = create_icns_file(
+        &settings.bundle_name(),
+        &resources_dir,
+        settings.icon_files().cloned().collect(),
+    )?;
 
     let mut plist = {
         let mut f = bundle_directory.clone();
@@ -49,8 +51,22 @@ pub fn bundle_project(settings: &Settings) -> ::Result<Vec<PathBuf>> {
     };
 
     let bin_name = settings.binary_name()?;
+    let bundle_icon = bundle_icon_file
+        .as_ref()
+        .and_then(|p| p.file_name())
+        .and_then(OsStr::to_str)
+        .unwrap_or("???");
+    let uri_scheme = settings.uri_scheme().map(|uri_scheme| {
+        add_bundle_url_types(
+            settings.bundle_name(),
+            settings.bundle_identifier(),
+            uri_scheme,
+            bundle_icon,
+        )
+    });
 
-    let contents = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+    let contents = format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
                             <!DOCTYPE plist PUBLIC \"-//Apple Computer//DTD PLIST 1.0//EN\" \
                                         \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
                             <plist version=\"1.0\">\n\
@@ -87,17 +103,17 @@ pub fn bundle_project(settings: &Settings) -> ::Result<Vec<PathBuf>> {
                                 <string>{}</string>\n\
                                 <key>NSHighResolutionCapable</key>\n\
                                 <true/>\n\
+                                {}
                             </dict>\n\
                             </plist>",
-                           bin_name,
-                           bundle_icon_file.as_ref()
-                               .and_then(|p| p.file_name())
-                               .and_then(OsStr::to_str)
-                               .unwrap_or("???"),
-                           settings.bundle_name(),
-                           settings.version_string(),
-                           settings.bundle_identifier(),
-                           settings.copyright_string().unwrap_or(""));
+        bin_name,
+        bundle_icon,
+        settings.bundle_name(),
+        settings.version_string(),
+        settings.bundle_identifier(),
+        settings.copyright_string().unwrap_or(""),
+        uri_scheme.unwrap_or(String::new()),
+    );
 
     try!(plist.write_all(&contents.into_bytes()[..]));
     try!(plist.sync_all());
@@ -152,16 +168,16 @@ fn copy_path(from: &Path, to: &Path) -> io::Result<()> {
 /// Given a list of icon files, try to produce an ICNS file in the resources
 /// directory and return the path to it.  Returns `Ok(None)` if no usable icons
 /// were provided.
-fn create_icns_file(bundle_name: &str,
-                    resources_dir: &PathBuf,
-                    icon_paths: Vec<PathBuf>)
-                    -> ::Result<Option<PathBuf>> {
+fn create_icns_file(bundle_name: &str, resources_dir: &PathBuf, icon_paths: Vec<PathBuf>) -> ::Result<Option<PathBuf>> {
     if icon_paths.is_empty() {
         return Ok(None);
     }
 
     // If one of the icon files is already an ICNS file, just use that.
-    if let Some(icns_path) = icon_paths.iter().find(|path| path.extension() == Some(OsStr::new("icns"))) {
+    if let Some(icns_path) = icon_paths.iter().find(|path| {
+        path.extension() == Some(OsStr::new("icns"))
+    })
+    {
         let mut dest_path = resources_dir.to_path_buf();
         // icns_path has been verified to be a file in Settings::new
         dest_path.push(icns_path.file_name().unwrap());
@@ -185,7 +201,10 @@ fn create_icns_file(bundle_name: &str,
                 }
                 Ok(())
             }
-            None => Err(io::Error::new(io::ErrorKind::InvalidData, "No matching IconType")),
+            None => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "No matching IconType",
+            )),
         }
     }
 
@@ -235,4 +254,30 @@ fn make_icns_image(img: image::DynamicImage) -> io::Result<icns::Image> {
         }
     };
     icns::Image::from_data(pixel_format, img.width(), img.height(), img.raw_pixels())
+}
+
+fn add_bundle_url_types(identifier: &str, name: &str, url: &str, icon: &str) -> String {
+    format!(
+        "\
+             <key>CFBundleURLTypes</key>
+             <array>\n\
+                <dict>\n\
+                    <key>CFBundleTypeRole</key>\n\
+                    <string>{}</string>\n\
+                    <key>CFBundleURLIconFile</key>\n\
+                    <string>{}</string>\n\
+                    <key>CFBundleURLName</key>\n\
+                    <string>{}</string>
+                    <key>CFBundleURLSchemes</key>\n\
+                    <array>\n\
+                        <string>{}</string>\n\
+                    </array>\n\
+                </dict>\n\
+                </array>\
+                ",
+        name,
+        icon,
+        identifier,
+        url
+    )
 }
