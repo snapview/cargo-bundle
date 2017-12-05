@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
 use std::fs::{self, File};
-use std::io::BufWriter;
+use std::io::{self, BufWriter, Write};
 use std::path::Path;
 use term;
 use walkdir::WalkDir;
@@ -52,16 +52,21 @@ pub fn copy_to_dir(from: &Path, to_dir: &Path) -> ::Result<()> {
 /// Prints a message to stdout, in the same format that `cargo` uses,
 /// indicating that we are creating a bundle with the given filename.
 pub fn print_bundling(filename: &str) -> ::Result<()> {
-    let mut output = match term::stdout() {
-        Some(terminal) => terminal,
-        None => bail!("Can't write to stdout"),
+    match term::stdout() {
+        Some(mut output) => {
+            output.attr(term::Attr::Bold)?;
+            output.fg(term::color::GREEN)?;
+            write!(output, "    Bundling")?;
+            output.reset()?;
+            write!(output, " {}\n", filename)?;
+            output.flush()?;
+        }
+        None => {
+            let mut stdout = io::stdout();
+            write!(stdout, "    Bundling")?;
+            write!(stdout, " {}\n", filename)?;
+        }
     };
-    output.attr(term::Attr::Bold)?;
-    output.fg(term::color::GREEN)?;
-    write!(output, "    Bundling")?;
-    output.reset()?;
-    write!(output, " {}\n", filename)?;
-    output.flush()?;
     Ok(())
 }
 
