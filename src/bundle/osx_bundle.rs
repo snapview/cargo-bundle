@@ -64,6 +64,16 @@ pub fn bundle_project(settings: &Settings) -> ::Result<Vec<PathBuf>> {
             bundle_icon,
         )
     });
+    let bundle_agent = settings.agent_app().map(|agent_app| {
+        if agent_app {
+            "\
+            <key>LSUIElement</key>\n\
+            <true />\n\
+            "
+        } else {
+            ""
+        }
+    });
 
     let contents = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
@@ -95,6 +105,7 @@ pub fn bundle_project(settings: &Settings) -> ::Result<Vec<PathBuf>> {
                                 <string>{}</string>\n\
                                 <key>CFBundleVersion</key>\n\
                                 <string></string>\n\
+                                {}
                                 <key>CSResourcesFileMapped</key>\n\
                                 <true/>\n\
                                 <key>LSRequiresCarbon</key>\n\
@@ -111,6 +122,7 @@ pub fn bundle_project(settings: &Settings) -> ::Result<Vec<PathBuf>> {
         settings.bundle_name(),
         settings.version_string(),
         settings.bundle_identifier(),
+        bundle_agent.unwrap_or(""),
         settings.copyright_string().unwrap_or(""),
         uri_scheme.unwrap_or(String::new()),
     );
